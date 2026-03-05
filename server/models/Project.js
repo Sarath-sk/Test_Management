@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const memberSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  role: { type: String, enum: ['admin', 'manager', 'tester'], default: 'tester' }
+  role: { type: String, enum: ['admin', 'manager', 'tester'], default: 'manager' }
 }, { _id: false });
 
 const projectSchema = new mongoose.Schema({
