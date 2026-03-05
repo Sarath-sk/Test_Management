@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchTestCases, deleteTestCase } from "../store/slices/testCasesSlice";
+import { fetchTestCases, deleteTestCase, deleteAllTestcase } from "../store/slices/testCasesSlice";
+import { fetchProjectById } from "../store/slices/projectsSlice";
 import api from "../api/axios";
 import {
   Plus,
@@ -18,9 +19,14 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import clsx from "clsx";
+import { createSuite, deleteSuite, fetchSuites, updateSuite } from "../store/slices/testSuiteSlice";
+import { createAsyncThunk } from "@reduxjs/toolkit";
 
-function SuiteTree({ suites, selected, onSelect, level = 0 }) {
+function SuiteTree({ suites, selected, onSelect, projectId, user, handleDeleteSuite, level = 0}) {
+  const dispatch = useDispatch();
   const [expanded, setExpanded] = useState({});
+  const [editingId, setEditingId] = useState(null);
+  const [editValue, setEditValue] = useState("");
   const roots = suites.filter((s) => !s.parentSuite);
   const children = (parentId) =>
     suites.filter((s) => s.parentSuite === parentId);
@@ -39,39 +45,62 @@ function SuiteTree({ suites, selected, onSelect, level = 0 }) {
               setExpanded((e) => ({ ...e, [suite._id]: !e[suite._id] }));
           }}
           className={clsx(
-            "flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer text-sm transition-colors",
+            "flex items-center justify-between gap-2 px-3 py-2 rounded-lg cursor-pointer text-sm transition-colors",
             isSelected
               ? "bg-brand-50 text-brand-700 font-medium"
               : "text-slate-600 hover:bg-slate-50",
           )}
         >
-          <span style={{ marginLeft: level * 12 }} />
-          {kids.length ? (
-            isExp ? (
-              <FolderOpen className="w-4 h-4 shrink-0" />
+          <div className="flex items-center gap-3 text-center">
+            <span style={{ marginLeft: level * 12 }} />
+            {kids.length ? (
+              isExp ? (
+                <FolderOpen className="w-4 h-4 shrink-0" />
+              ) : (
+                <Folder className="w-4 h-4 shrink-0" />
+              )
             ) : (
-              <Folder className="w-4 h-4 shrink-0" />
-            )
-          ) : (
-            <Folder className="w-4 h-4 shrink-0 opacity-40" />
-          )}
-          <span className="truncate">{suite.name}</span>
-          {/* <div>
-            <Link
-              to={`/projects/${projectId}/suites/${suite._id}/edit`}
-              className="w-7 h-7 flex items-center justify-center rounded hover:bg-brand-50 text-slate-400 hover:text-brand-600"
-            >
+              <Folder className="w-4 h-4 shrink-0 opacity-40" />
+            )}
+            {editingId === suite._id ?(
+              <input type="text"
+                value={editValue}
+                autoFocus
+                onChange={(e)=>setEditValue(e.target.value)}
+                onClick={(e)=>e.stopPropagation()}
+                onKeyDown={async (e)=>{
+                  if(e.key === "Enter"){
+                    await dispatch(updateSuite({
+                      id: suite._id,
+                      body: {name: editValue}
+                    })
+                  );
+                  setEditingId(null);
+                  }
+                }}
+                className="truncate"
+              />
+            ):(
+              <span className="truncate">{suite.name}</span>
+            )}
+          </div>
+          <div className="flex items-center">
+            <button className="w-7 h-7 flex items-center justify-center rounded hover:bg-blue-50 text-slate-400 hover:text-blue-500" onClick={(e)=>{
+              e.stopPropagation();
+              setEditingId(suite._id);
+              setEditValue(suite.name);
+            }}>
               <Edit className="w-3.5 h-3.5" />
-            </Link>
+            </button>
             {["admin", "manager"].includes(user?.role) && (
               <button
-                onClick={() => handleDelete(suite._id)}
+                onClick={() =>{handleDeleteSuite(suite._id)}}
                 className="w-7 h-7 flex items-center justify-center rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             )}
-          </div> */}
+          </div>
         </div>
         {isExp && kids.map((kid) => renderSuite(kid))}
       </div>
@@ -88,8 +117,9 @@ export default function ProjectDetail() {
   const user = useSelector((s) => s.auth.user);
   const { list: testCases, loading, total } = useSelector((s) => s.testCases);
 
-  const [project, setProject] = useState(null);
-  const [suites, setSuites] = useState([]);
+  // const [project, setProject] = useState(null);
+  const { selectedProject: project } = useSelector(s => s.projects);
+  const { list: suites } = useSelector((s) => s.testSuite);
   const [selectedSuite, setSelectedSuite] = useState(null);
   const [showNewSuite, setShowNewSuite] = useState(false);
   const [newSuiteName, setNewSuiteName] = useState("");
@@ -99,12 +129,13 @@ export default function ProjectDetail() {
     search: "",
   });
   const [selected, setSelected] = useState([]);
+  const [isSelected, setIsSelected] = useState(false);
+
 
   useEffect(() => {
-    api.get(`/projects/${projectId}`).then((r) => setProject(r.data));
-    api
-      .get("/suites", { params: { projectId } })
-      .then((r) => setSuites(r.data));
+    dispatch(fetchSuites(projectId));
+    dispatch(fetchProjectById(projectId));
+
   }, [projectId]);
 
   useEffect(() => {
@@ -117,16 +148,26 @@ export default function ProjectDetail() {
     );
   }, [projectId, selectedSuite, filters]);
 
-  const handleCreateSuite = async (e) => {
+
+  const handleCreateSuite = async (e) =>{
     e.preventDefault();
-    const { data } = await api.post("/suites", {
-      name: newSuiteName,
-      project: projectId,
-    });
-    setSuites((prev) => [...prev, data]);
+
+    const result = await dispatch(
+      createSuite({
+        name: newSuiteName,
+        project:projectId,
+      })
+    );
     setNewSuiteName("");
     setShowNewSuite(false);
-    toast.success("Suite created");
+    toast.success("Suite Created");
+ 
+  };
+
+  const handleDeleteSuite = async (id) => {
+    if (!confirm("Delete this Suite")) return;
+    await dispatch(deleteSuite(id));
+    toast.success("Deleted");
   };
 
   const handleDelete = async (id) => {
@@ -159,6 +200,21 @@ export default function ProjectDetail() {
       {s}
     </span>
   );
+
+  const handleDeleteAll = async () =>{
+    try{
+      if(!selected.length) return;
+      if(!confirm(`Delete ${selected.length} testcase? This cannot be undone!`)) return;
+      const res = await dispatch(deleteAllTestcase(selected));
+      toast.success(res.payload.message);
+      setSelected([])
+      dispatch(fetchTestCases({ projectId }));
+      setIsSelected(false);
+    }catch(error){
+      toast.error(res.payload);
+      return;
+    }
+  }
 
   return (
     <div className="flex h-full gap-0 -m-6 h-[calc(100vh-4rem)]">
@@ -215,6 +271,9 @@ export default function ProjectDetail() {
             suites={suites}
             selected={selectedSuite}
             onSelect={setSelectedSuite}
+            projectId={projectId}
+            user={user}
+            handleDeleteSuite={handleDeleteSuite}
           />
         </div>
       </div>
@@ -223,7 +282,7 @@ export default function ProjectDetail() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Toolbar */}
         <div className="p-4 border-b border-slate-200 bg-white flex items-center gap-3 flex-wrap">
-          <div className="flex-1">
+          <div className="flex-2x">
             <p className="text-xs text-slate-400">
               {total} test case{total !== 1 ? "s" : ""}
             </p>
@@ -290,6 +349,10 @@ export default function ProjectDetail() {
               <Plus className="w-3.5 h-3.5" /> Add Test
             </Link>
           )}
+          {isSelected && (<button className=" bg-red-500 text-white hover:bg-red-500 btn-ghost py-1.5 text-sm" onClick={handleDeleteAll}>
+            <Trash2 className="w-3.5 h-3.5" />
+            Delete All
+            </button>)}
         </div>
 
         {/* Table */}
@@ -317,11 +380,13 @@ export default function ProjectDetail() {
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-8">
                     <input
                       type="checkbox"
-                      onChange={(e) =>
+                      checked={isSelected}
+                      onChange={(e) =>{
+                        setIsSelected(prev => !prev);
                         setSelected(
                           e.target.checked ? testCases.map((t) => t._id) : [],
-                        )
-                      }
+                        );
+                      }}
                     />
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">

@@ -6,6 +6,11 @@ export const fetchProjects = createAsyncThunk('projects/fetchAll', async (_, { r
   catch (e) { return rejectWithValue(e.response?.data?.message); }
 });
 
+export const fetchProjectById = createAsyncThunk('projects/:id', async (id, { rejectWithValue}) =>{
+  try{ const {data} = await api.get(`/projects/${id}`); return data;}
+    catch(e){return rejectWithValue(e.response?.data?.message);}
+});
+
 export const createProject = createAsyncThunk('projects/create', async (body, { rejectWithValue }) => {
   try { const { data } = await api.post('/projects', body); return data; }
   catch (e) { return rejectWithValue(e.response?.data?.message); }
@@ -32,6 +37,9 @@ const projectsSlice = createSlice({
       .addCase(fetchProjects.pending, s => { s.loading = true; })
       .addCase(fetchProjects.fulfilled, (s, a) => { s.loading = false; s.list = a.payload; })
       .addCase(fetchProjects.rejected, (s, a) => { s.loading = false; s.error = a.payload; })
+      .addCase(fetchProjectById.pending, (s) => { s.loading = true; })
+      .addCase(fetchProjectById.fulfilled, (s, a) => { s.loading = false; s.selectedProject = a.payload;})
+      .addCase(fetchProjectById.rejected, (s, a) => { s.loading = false; s.error = a.payload;})
       .addCase(createProject.fulfilled, (s, a) => { s.list.unshift(a.payload); })
       .addCase(updateProject.fulfilled, (s, a) => { const i = s.list.findIndex(p => p._id === a.payload._id); if (i !== -1) s.list[i] = a.payload; })
       .addCase(deleteProject.fulfilled, (s, a) => { s.list = s.list.filter(p => p._id !== a.payload); });

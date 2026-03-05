@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { login, register, clearError } from '../store/slices/authSlice';
 import { FlaskConical } from 'lucide-react';
 import toast from 'react-hot-toast';
+import revolution from "../assets/Revolution.jpeg";
 
 export default function Login() {
   const [mode, setMode] = useState('login');
@@ -29,8 +30,8 @@ export default function Login() {
     <div className="min-h-screen bg-gradient-to-br from-brand-50 to-slate-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="w-14 h-14 bg-brand-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <FlaskConical className="w-7 h-7 text-white" />
+          <div className="">
+            <img src="" alt="Logo" />
           </div>
           <h1 className="text-3xl font-bold text-slate-900">Test Management</h1>
           <p className="text-slate-500 mt-1">Test case management for modern teams</p>
@@ -64,7 +65,7 @@ export default function Login() {
               <input className="input" type="password" placeholder="••••••••" value={form.password}
                 onChange={e => setForm(f => ({ ...f, password: e.target.value }))} required />
             </div>
-            {mode === 'register' && (
+            {/* {mode === 'register' && (
               <div>
                 <label className="label">Role</label>
                 <select className="input" value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
@@ -73,7 +74,7 @@ export default function Login() {
                   <option value="admin">Admin</option>
                 </select>
               </div>
-            )}
+            )} */}
             <button type="submit" disabled={loading} className="btn-primary w-full justify-center py-2.5 mt-2">
               {loading ? 'Please wait...' : mode === 'login' ? 'Sign In' : 'Create Account'}
             </button>

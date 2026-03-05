@@ -1,3 +1,4 @@
+const TestCase = require('../models/TestCase');
 const TestSuite = require('../models/TestSuite');
 
 // Get the list of suites by project Id
@@ -58,7 +59,7 @@ const createTestSuites = async (req, res) =>{
 // Update suite by suite id
 const updateSuiteById = async (req, res) =>{
     try{
-        const {suiteId} = req.params.id;
+        const suiteId = req.params.id;
         if(!['admin', 'manager'].includes(req.user.role)){
             return res.status(400).json({
                 message: "Insufficient permissions"
@@ -84,7 +85,7 @@ const updateSuiteById = async (req, res) =>{
 // Delete suite by id
 const deleteSuiteById = async (req, res) =>{
     try{
-        const {suiteId} = req.params.id;
+        const suiteId = req.params.id;
 
         if(!['admin', 'manager'].includes(req.user.role)){
             return res.status(400).json({
@@ -92,10 +93,20 @@ const deleteSuiteById = async (req, res) =>{
             });
         }
 
+        const suite = await TestSuite.findById(suiteId);
+
+        if(!suite){
+            return res.status(404).json({
+                message: "Suite not found!"
+            });
+        }
+
+        
+        await TestCase.deleteMany({suite: suiteId});
         await TestSuite.findByIdAndDelete(suiteId);
 
         res.status(204).json({
-            message: "Suite deleted!"
+            message: "Suite and associated testcases deleted!"
         });
 
     }catch(error){
